@@ -16,20 +16,37 @@ logger = logging.getLogger(__name__)
 def get_events():
     try:
         url = 'https://streamed.su'
-        response = requests.get(url, timeout=10)  # Added timeout
-
+        
+        # Define custom headers
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                          'AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/129.0.0.0 Safari/537.36'
+        }
+        
+        # Make the GET request with custom headers
+        response = requests.get(url, headers=headers, timeout=10)
+        
         if response.status_code != 200:
             logger.error(f"Failed to retrieve the webpage. Status code: {response.status_code}")
             return jsonify({"error": "Failed to retrieve the webpage."}), 500
 
+        # Parse the HTML content
         soup = BeautifulSoup(response.content, 'html.parser')
         links = soup.find_all('a')
 
+        # Extract href attributes
         hrefs = [link.get('href') for link in links if link.get('href')]
-        filtered_hrefs = [href.split('/watch/')[1] for href in hrefs if href.startswith('/watch/')]
+        filtered_hrefs = []
+        for href in hrefs:
+            if href.startswith('/watch/'):
+                try:
+                    filtered_hrefs.append(href.split('/watch/')[1])
+                except IndexError:
+                    logger.warning(f"Unexpected href format: {href}")
+                    continue
 
         names = list(set(filtered_hrefs))
-
         logger.info(f"Fetched {len(names)} events.")
         return jsonify(names), 200
 
