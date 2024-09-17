@@ -59,6 +59,7 @@ def get_events():
 
 @app.route('/')
 def home():
+    logger.info("Successful '/' call")
     return "Hello, Heroku!"
 
 if __name__ == '__main__':
