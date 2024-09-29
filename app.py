@@ -1,12 +1,12 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 import requests
-from bs4 import BeautifulSoup
+#from bs4 import BeautifulSoup
 import os
 import logging
 import time
-import re
-import json5
+#import re
+#import json5
 
 app = Flask(__name__)
 CORS(app)
@@ -52,6 +52,7 @@ def get_events():
         Flask Response: JSON response containing the list of processed events or an error message.
     """
     url = 'https://streamed.su'
+    endpoint = "/api/matches/live"
 
     # Define custom headers to mimic a browser
     headers = {
@@ -61,66 +62,68 @@ def get_events():
     }
 
     # Fetch the URL with retries
-    response = fetch_url(url, headers=headers)
+    response = fetch_url(f"{url}{endpoint}", headers=headers)
 
     if not response:
         logger.error("Failed to retrieve the webpage after multiple attempts.")
         return jsonify({"error": "Failed to retrieve the webpage."}), 500
+    print(response)
 
-    # Parse the HTML content
-    try:
-        soup = BeautifulSoup(response.content, 'html.parser')
-        script_tags = soup.find_all('script')
-        logger.info(f"Found {len(script_tags)} <script> tags in the webpage.")
-    except Exception as e:
-        logger.error(f"Error parsing HTML: {e}")
-        return jsonify({"error": "Failed to parse the webpage content."}), 500
+    # # Parse the HTML content
+    # try:
+    #     soup = BeautifulSoup(response.content, 'html.parser')
+    #     script_tags = soup.find_all('script')
+    #     logger.info(f"Found {len(script_tags)} <script> tags in the webpage.")
+    # except Exception as e:
+    #     logger.error(f"Error parsing HTML: {e}")
+    #     return jsonify({"error": "Failed to parse the webpage content."}), 500
 
-    # Initialize variable to store the data object string
-    data_str = None
+    # # Initialize variable to store the data object string
+    # data_str = None
 
-    # Iterate through all script tags to find the one containing 'const data ='
-    for script in script_tags:
-        if script.string and 'const data =' in script.string:
-            # Use regex to extract the array assigned to data
-            match = re.search(r'const\s+data\s*=\s*(\[\s*\{.*?\}\s*\]);', script.string, re.DOTALL)
-            if match:
-                data_str = match.group(1)
-                logger.info("Successfully extracted data object string from <script> tag.")
-                break
+    # # Iterate through all script tags to find the one containing 'const data ='
+    # for script in script_tags:
+    #     if script.string and 'const data =' in script.string:
+    #         # Use regex to extract the array assigned to data
+    #         match = re.search(r'const\s+data\s*=\s*(\[\s*\{.*?\}\s*\]);', script.string, re.DOTALL)
+    #         if match:
+    #             data_str = match.group(1)
+    #             logger.info("Successfully extracted data object string from <script> tag.")
+    #             break
 
-    if not data_str:
-        logger.error("Data object not found in any <script> tags.")
-        return jsonify({"error": "Data object not found."}), 500
+    # if not data_str:
+    #     logger.error("Data object not found in any <script> tags.")
+    #     return jsonify({"error": "Data object not found."}), 500
 
-    # Step 1: Replace standalone 'void 0' and 'undefined' with 'null' using word boundaries
-    data_str_cleaned = re.sub(r'\bvoid\s+0\b', 'null', data_str)
-    data_str_cleaned = re.sub(r'\bundefined\b', 'null', data_str_cleaned)
+    # # Step 1: Replace standalone 'void 0' and 'undefined' with 'null' using word boundaries
+    # data_str_cleaned = re.sub(r'\bvoid\s+0\b', 'null', data_str)
+    # data_str_cleaned = re.sub(r'\bundefined\b', 'null', data_str_cleaned)
 
-    # Step 2: Remove trailing commas
-    data_str_cleaned = re.sub(r',\s*([}\]])', r'\1', data_str_cleaned)
+    # # Step 2: Remove trailing commas
+    # data_str_cleaned = re.sub(r',\s*([}\]])', r'\1', data_str_cleaned)
 
-    # Step 3: Parse the cleaned string using json5
-    try:
-        data_object = json5.loads(data_str_cleaned)
-        logger.info("Successfully parsed data object using json5.")
-    except json5.JSONDecodeError as e:
-        logger.error(f"Failed to parse JSON5: {e}")
-        # Optionally, save the cleaned data to a file for manual inspection
-        with open('cleaned_data.json5', 'w', encoding='utf-8') as f:
-            f.write(data_str_cleaned)
-        logger.info("The cleaned data has been saved to 'cleaned_data.json5' for further inspection.")
-        return jsonify({"error": "Failed to parse data object."}), 500
+    # # Step 3: Parse the cleaned string using json5
+    # try:
+    #     data_object = json5.loads(data_str_cleaned)
+    #     logger.info("Successfully parsed data object using json5.")
+    # except json5.JSONDecodeError as e:
+    #     logger.error(f"Failed to parse JSON5: {e}")
+    #     # Optionally, save the cleaned data to a file for manual inspection
+    #     with open('cleaned_data.json5', 'w', encoding='utf-8') as f:
+    #         f.write(data_str_cleaned)
+    #     logger.info("The cleaned data has been saved to 'cleaned_data.json5' for further inspection.")
+    #     return jsonify({"error": "Failed to parse data object."}), 500
 
-    # Extract liveMatches
-    try:
-        live_matches = data_object[1]['data']['liveMatches']
-        logger.info(f"Extracted {len(live_matches)} live matches from data object.")
-    except (IndexError, KeyError, TypeError) as e:
-        logger.error(f"Error extracting liveMatches: {e}")
-        return jsonify({"error": "Failed to extract live matches data."}), 500
+    # # Extract liveMatches
+    # try:
+    #     live_matches = data_object[1]['data']['liveMatches']
+    #     logger.info(f"Extracted {len(live_matches)} live matches from data object.")
+    # except (IndexError, KeyError, TypeError) as e:
+    #     logger.error(f"Error extracting liveMatches: {e}")
+    #     return jsonify({"error": "Failed to extract live matches data."}), 500
 
     # Process liveMatches
+    live_matches = response.json()
     base_url = "https://embedme.top/embed/"
     processed_matches = []
     skipped_events = 0
@@ -129,9 +132,9 @@ def get_events():
     for event in live_matches:
         try:
             event_id = event.get('id')
-            source = event.get('source')
+            source = event.get('source', "alpha")
 
-            if not all([event_id, source]):
+            if not all([event_id]):
                 missing_fields = []
                 if not event_id:
                     missing_fields.append('id')
