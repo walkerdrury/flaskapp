@@ -131,6 +131,7 @@ def get_events():
 
     for event in live_matches:
         try:
+            event['id'] = event['sources'][0]['id']
             event_id = event.get('id')
             source = event.get('source', "alpha")
 
